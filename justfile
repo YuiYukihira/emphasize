@@ -9,3 +9,7 @@ check:
 # Run unit tests
 test:
 	cargo test -- --nocapture
+
+# Runs emphasize in local development mode
+run:
+	RUSTLOG="emphasize=info" cargo run .emphasize/config.yml

@@ -101,17 +101,33 @@ impl ConfigBuilder {
     /// Create a config from this builder, replacing missing values with defaults
     pub fn build_with_defaults(self) -> Config {
         let default_config = Config::default();
-        Config {
-            cache_dir: self.cache_dir.unwrap_or(default_config.cache_dir),
-            db: self.db.unwrap_or(default_config.db),
-            debug: self.debug.unwrap_or(false),
-            content_dir: self.content_dir.unwrap_or(default_config.content_dir),
-            operating_mode: self.operating_mode.unwrap_or(default_config.operating_mode),
-        }
+        Config::new(
+            self.cache_dir.unwrap_or(default_config.cache_dir),
+            self.db.unwrap_or(default_config.db),
+            self.debug.unwrap_or(false),
+            self.content_dir.unwrap_or(default_config.content_dir),
+            self.operating_mode.unwrap_or(default_config.operating_mode),
+        )
     }
 }
 
 impl Config {
+    pub fn new(
+        cache_dir: PathBuf,
+        db: PathBuf,
+        debug: bool,
+        content_dir: PathBuf,
+        operating_mode: OperatingMode,
+    ) -> Self {
+        Self {
+            cache_dir,
+            db,
+            debug,
+            content_dir,
+            operating_mode,
+        }
+    }
+
     pub fn cache_dir(&self) -> &Path {
         &self.cache_dir
     }
@@ -130,6 +146,13 @@ impl Config {
 
     pub fn operating_mode(&self) -> OperatingMode {
         self.operating_mode
+    }
+
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> crate::Result<()> {
+        let f = File::create(path)?;
+        serde_yaml::to_writer(f, self)?;
+
+        Ok(())
     }
 }
 

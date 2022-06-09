@@ -20,12 +20,13 @@
 #![feature(generic_associated_types)]
 #![deny(missing_docs)]
 use std::{
-    env,
     ops::Deref,
     path::{Component, Path, PathBuf},
     sync::{mpsc, Arc},
 };
 
+use clap::Parser;
+use cli::Cli;
 use config::Config;
 use db::{
     input_files::InputFile,
@@ -36,7 +37,6 @@ use db::{
     revision_stylesheet::RevisionStylesheet,
 };
 use http::route_with_catch;
-use liquid::Parser;
 use notify::{RecommendedWatcher, Watcher};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -51,6 +51,7 @@ use crate::{
     walk::{process_walker_events, process_watch_events, walk_assets},
 };
 
+mod cli;
 mod config;
 mod db;
 mod filters;
@@ -79,18 +80,24 @@ type Migrations = MigrateSum<
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let cli = Cli::parse();
+    cli.run().await?;
+
+    Ok(())
+}
+
+async fn run_local_server(config_file: &Path) -> Result<()> {
     pretty_env_logger::init();
     color_eyre::install()?;
 
-    let mut args = env::args();
-    let config_file = args.nth(1);
-
     log::info!("Opening config...");
-    let mut config_builder = ConfigBuilder::new();
-    if let Some(file) = &config_file {
-        config_builder = config_builder.with_file(file)?;
-    }
-    let config = Arc::new(config_builder.with_envs()?.build_with_defaults());
+    let config_builder = ConfigBuilder::new();
+    let config = Arc::new(
+        config_builder
+            .with_file(config_file)?
+            .with_envs()?
+            .build_with_defaults(),
+    );
 
     log::info!("Working with: {:?}", config);
 
@@ -116,7 +123,7 @@ async fn main() -> Result<()> {
 async fn with_watch(
     config: Arc<Config>,
     pool: Pool<SqliteConnectionManager>,
-    templater: Parser,
+    templater: liquid::Parser,
 ) -> Result<()> {
     let (mut walker_tx, walker_rx) = mpsc::channel();
     let (reload_tx, reload_rx) = watch::channel::<usize>(0);
@@ -175,7 +182,7 @@ async fn with_watch(
 async fn without_watch(
     config: Arc<Config>,
     pool: Pool<SqliteConnectionManager>,
-    templater: Parser,
+    templater: liquid::Parser,
 ) -> Result<()> {
     let (reload_tx, reload_rx) = watch::channel::<usize>(0);
     let mut counter = 0;
